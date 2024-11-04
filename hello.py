@@ -1,29 +1,23 @@
 
 from flask import Flask, Response
-import subprocess
+from picamera import PiCamera
+import time
 
 app = Flask(__name__)
 
-def generate_frames():
-    # Start libcamera-vid and pipe the output to stdout
-    command = [
-        'libcamera-vid',
-        '--inline',
-        '--framerate', '30',
-        '--width', '640',
-        '--height', '480',
-        '--output', '-'
-    ]
+# Initialize the camera
+camera = PiCamera()
+camera.resolution = (640, 480)
+camera.framerate = 24
+time.sleep(2)  # Allow the camera to warm up
 
-    # Start the subprocess
-    with subprocess.Popen(command, stdout=subprocess.PIPE) as process:
-        while True:
-            # Read a frame from stdout
-            frame = process.stdout.read(640 * 480 * 3)  # Adjust for RGB frames
-            if not frame:
-                break
+def generate_frames():
+    while True:
+        # Capture frames from the camera
+        frame = camera.capture_continuous('frame.jpg', format='jpeg', use_video_port=True)
+        with open('frame.jpg', 'rb') as f:
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                   b'Content-Type: image/jpeg\r\n\r\n' + f.read() + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
@@ -32,17 +26,17 @@ def video_feed():
 
 @app.route('/')
 def index():
-    return '''
+    return """
     <html>
         <head>
-            <title>IP Camera Feed</title>
+            <title>Raspberry Pi Camera Stream</title>
         </head>
         <body>
-            <h1>Raspberry Pi CSI Camera Feed</h1>
-            <img src="/video_feed">
+            <h1>Raspberry Pi Camera Stream</h1>
+            <img src="{{ url_for('video_feed') }}">
         </body>
     </html>
-    '''
+    """
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
