@@ -1,26 +1,19 @@
 from flask import Flask, Response
-import cv2
+import subprocess
 
 app = Flask(__name__)
 
-# Initialize the camera using libcamera
 def generate_frames():
-    # Start the video stream using libcamera
-    cap = cv2.VideoCapture("libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 --codec h264 --output - | ffmpeg -i pipe:0 -f mjpeg -")
+    # Using libcamera to capture frames
+    command = ["libcamera-vid", "--width", "640", "--height", "480", "--framerate", "30", "--inline", "--output", "/dev/stdout"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     while True:
-        # Read the frame from the video capture
-        success, frame = cap.read()
-        if not success:
+        frame = process.stdout.read(640 * 480 * 3)  # Read raw RGB frame
+        if not frame:
             break
-        else:
-            # Encode the frame as JPEG
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-
-            # Yield the frame in the appropriate format
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
@@ -29,17 +22,7 @@ def video_feed():
 
 @app.route('/')
 def index():
-    return '''
-        <html>
-            <head>
-                <title>IP Camera Stream</title>
-            </head>
-            <body>
-                <h1>Raspberry Pi Camera Stream</h1>
-                <img src="/video_feed">
-            </body>
-        </html>
-    '''
+    return "<h1>Raspberry Pi Camera Stream</h1><img src='/video_feed' />"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
