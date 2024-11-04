@@ -1,22 +1,27 @@
 from flask import Flask, Response
-import cv2
+import subprocess
 
 app = Flask(__name__)
 
-# Initialize the camera
-camera = cv2.VideoCapture(0)  # 0 is usually the index for the CSI camera
-
 def generate_frames():
-    while True:
-        # Capture frame-by-frame
-        success, frame = camera.read()
-        if not success:
-            break
-        else:
-            # Encode the frame in JPEG format
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            # Yield the frame in the correct format for streaming
+    # Start libcamera-vid with pipe to get frames
+    command = [
+        'libcamera-vid',
+        '--inline',  # Enable inline headers
+        '--width', '640',
+        '--height', '480',
+        '--framerate', '30',
+        '--timeout', '0',  # Run indefinitely
+        '--output', '-'
+    ]
+
+    # Use subprocess to capture the video output
+    with subprocess.Popen(command, stdout=subprocess.PIPE) as process:
+        while True:
+            # Read video frames from stdout
+            frame = process.stdout.read(640 * 480 * 3)  # Adjust the size for RGB frames
+            if not frame:
+                break
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
