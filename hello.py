@@ -1,25 +1,25 @@
+
 from flask import Flask, Response
 import subprocess
 
 app = Flask(__name__)
 
 def generate_frames():
-    # Start libcamera-vid with pipe to get frames
+    # Start libcamera-vid and pipe the output to stdout
     command = [
         'libcamera-vid',
-        '--inline',  # Enable inline headers
+        '--inline',
+        '--framerate', '30',
         '--width', '640',
         '--height', '480',
-        '--framerate', '30',
-        '--timeout', '0',  # Run indefinitely
         '--output', '-'
     ]
 
-    # Use subprocess to capture the video output
+    # Start the subprocess
     with subprocess.Popen(command, stdout=subprocess.PIPE) as process:
         while True:
-            # Read video frames from stdout
-            frame = process.stdout.read(640 * 480 * 3)  # Adjust the size for RGB frames
+            # Read a frame from stdout
+            frame = process.stdout.read(640 * 480 * 3)  # Adjust for RGB frames
             if not frame:
                 break
             yield (b'--frame\r\n'
