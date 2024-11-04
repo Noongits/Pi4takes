@@ -1,23 +1,26 @@
-
 from flask import Flask, Response
-from picamera import PiCamera
-import time
+import cv2
 
 app = Flask(__name__)
 
-# Initialize the camera
-camera = PiCamera()
-camera.resolution = (640, 480)
-camera.framerate = 24
-time.sleep(2)  # Allow the camera to warm up
-
+# Initialize the camera using libcamera
 def generate_frames():
+    # Start the video stream using libcamera
+    cap = cv2.VideoCapture("libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 --codec h264 --output - | ffmpeg -i pipe:0 -f mjpeg -")
+
     while True:
-        # Capture frames from the camera
-        frame = camera.capture_continuous('frame.jpg', format='jpeg', use_video_port=True)
-        with open('frame.jpg', 'rb') as f:
+        # Read the frame from the video capture
+        success, frame = cap.read()
+        if not success:
+            break
+        else:
+            # Encode the frame as JPEG
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+
+            # Yield the frame in the appropriate format
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + f.read() + b'\r\n')
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
@@ -26,17 +29,17 @@ def video_feed():
 
 @app.route('/')
 def index():
-    return """
-    <html>
-        <head>
-            <title>Raspberry Pi Camera Stream</title>
-        </head>
-        <body>
-            <h1>Raspberry Pi Camera Stream</h1>
-            <img src="{{ url_for('video_feed') }}">
-        </body>
-    </html>
-    """
+    return '''
+        <html>
+            <head>
+                <title>IP Camera Stream</title>
+            </head>
+            <body>
+                <h1>Raspberry Pi Camera Stream</h1>
+                <img src="/video_feed">
+            </body>
+        </html>
+    '''
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, threaded=True)
+    app.run(host='0.0.0.0', port=5000)
