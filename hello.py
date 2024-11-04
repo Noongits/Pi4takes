@@ -1,4 +1,4 @@
-from flask import Flask, send_file
+from flask import Flask, send_file, jsonify
 import subprocess
 import os
 
@@ -18,11 +18,20 @@ def capture_image():
         "--quiet"  # Suppress output
     ]
     
-    # Run the command
-    subprocess.run(command)
-    
-    # Send the image file as response
-    return send_file(image_filename, mimetype='image/jpeg')
+    try:
+        # Run the command and wait for it to complete
+        subprocess.run(command, check=True)
+
+        # Check if the file was created
+        if os.path.exists(image_filename):
+            return send_file(image_filename, mimetype='image/jpeg')
+        else:
+            return jsonify({"error": "Image capture failed."}), 500
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": "Failed to capture image.", "details": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "An error occurred.", "details": str(e)}), 500
 
 @app.route('/')
 def index():
